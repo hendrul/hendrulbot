@@ -1,8 +1,13 @@
 #!/usr/bin/env node
 const request = require('request')
 const qs = require('querystring')
+const EventEmitter = require('events')
+
+const tickEmitter = new EventEmitter()
 
 let requestRateLimit = false
+
+const AGG_TICKS = 10
 
 const endpoints = {
   exchangeInfo: async function() {
@@ -32,11 +37,19 @@ async function start() {
       console.log('Binance Request Rate Limit has been reached!')
       System.exit(1)
     }
-    let endpoint = endpoints[process.argv[2]]
-    let params = { symbol: `${process.argv[3]}` }
-    let tick = await endpoint(params)
+    let tick = await endpoints.tickerPrice()
+    processTick(tick)
     console.log(tick)
   }
+}
+
+function processTick(tick) {
+  let data = {
+    buffer: tick.concat(data).slice(0, AGG_TICKS)
+    prices: tick
+  }
+  tickEmitter.emit('tick', data)
+
 }
 
 function requestEndpoint(endpoint, params) {
