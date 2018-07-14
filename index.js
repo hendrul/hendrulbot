@@ -26,66 +26,60 @@ const endpoints = {
   }
 }
 
-function start(endpoint, params, interval) {
+async function start(endpoint, params, interval) {
    if(requestRateLimit) {
      console.log('Binance Request Rate Limit has been reached!')
      System.exit(1)
    }
 
-   return endpoints[endpoint](params).then(tick => {
-   	 console.log(tick)
-   	 if (interval) {
-   	   return wait (interval).then (() => start (endpoint, params, interval))
-   	 }
-   	 return tick
-   })
+   const tick = await endpoints[endpoint](params)
+   if (interval) {
+     await wait (interval)
+     return start (endpoint, params, interval)
+   } else {
+     return tick
+   }
 }
 
 const markets = ['BNB','ETH','BTC','USDT']
 
-function findArbitrage () {
-	return endpoints.ticker24hr({}).then (data => {
-		data = JSON.parse(data)
-		data = data.reduce ((m, s) => Object.assign(
-		  {[s.symbol]: s}, m
-		), {})
-		const pairs = Object.keys(data)
-		let symbols = pairs.map (p => (
-			 p.match(new RegExp (`([A-Z]+)(${markets.join ('|')})`,'i'))[1]
-    ))
-    symbols = symbols.filter ((e, pos) => (
-			symbols.indexOf(e) == pos
-    ))
-    const prices = symbols.reduce((m, s) => Object.assign(
-    	 m, {[s]: markets.map (mk => data[s + mk])}
-    ), {})
-		const bestBet = Object.keys(prices).reduce ((m, s)=>(
-		  Object.assign(m, {
-        [s]: {
-          bestBuy: prices[s].reduce((m, p) => {
-            if(!m&&!p) return
-            if(!m) return p
-            if(!p) return m
-            let bridge = data[
-            m.symbol.slice(s.length, m.symbol.length) +
-            p.symbol.slice(s.length, p.symbol.length)
-              ]
-            return p.askPrice < m.askPrice * bridge.askPrice ? p : m
-          }),
-          bestSell: prices[s].reduce((m, p) => {
-            if(!m&&!p) return
-            if(!m) return p
-            if(!p) return m
-            let bridge = data[
-              m.symbol.slice(s.length, m.symbol.length) +
-              p.symbol.slice(s.length, p.symbol.length)]
-            return p.bidPrice > m.bidPrice * bridge.bidPrice ? p : m
-          })
-        }
-		  })
-    ))
-    return bestBet
-  })
+function findArbitrage (data) {
+  const pairs = data.map(s => s.symbol)
+  let symbols = getAllSymbols(pairs)
+  const prices = symbols.reduce((m, s) => Object.assign(
+     m, {[s]: markets.map (mk => data[s + mk])}
+  ), {})
+  const bestBet = Object.keys(prices).reduce ((m, s)=>(
+    Object.assign(m, {
+      [s]: prices[s].reduce((m, p) => {
+        if(!m&&!p) return
+        if(!m) return p
+        if(!p) return m
+        let bridge = data[
+          m.symbol.slice(s.length, m.symbol.length) +
+          p.symbol.slice(s.length, p.symbol.length)
+        ]
+        return p.askPrice < m.askPrice * bridge.askPrice ? p : m
+      },[])
+    })
+  ))
+  return bestBet
+}
+
+function getAllSymbols(pairs) {
+  return pairs.map (p => (
+    p.match(new RegExp (`([A-Z]+)(${markets.join ('|')})`,'i'))[1]
+  )).filter ((e, pos) => (
+    symbols.indexOf(e) == pos
+  ))
+}
+
+//function getBaseAsset(symbol, symbols)
+
+function a(s1,s2,bridge) {
+  //bid-ask-ask
+  //s1.bidPrice
+  //bid-bid-ask
 }
 
 
@@ -112,18 +106,28 @@ function wait(secs = 0) {
     setTimeout(() => resolve(), secs*1000)
   })
 }
-/*
-console.log (
-	chalk.blue (
-		figlet.textSync('H3ndrul B@t', {
-      font: 'Ghost',
-      horizontalLayout: 'default',
-      verticalLayout: 'default'
-    })
+
+function showAppName() {
+  console.log (
+    chalk.blue (
+      figlet.textSync('H3ndrul B@t', {
+        font: 'Ghost',
+        horizontalLayout: 'default',
+        verticalLayout: 'default'
+      })
+    )
   )
-)*/
+}
+
 
 let endpoint = process.argv[2]
 let params = { symbol: process.argv[3] }
-//start(endpoint, params).then ()
-findArbitrage ().then (console.log)
+start(endpoint, {}).then (console.log)
+
+// function doArbitrageCalc() {
+//   endpoints.ticker24hr({}).then (data => {
+//     data = JSON.parse(data)
+//     console.log(findArbitrage(data))
+//   })
+// }
+
